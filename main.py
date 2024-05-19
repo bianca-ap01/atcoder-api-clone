@@ -1,9 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+import mysql.connector
 from typing import List, Dict, Any
 
 app = FastAPI()
@@ -17,28 +15,14 @@ app.add_middleware(
     allow_headers=["*"],  # Permitir todos los encabezados
 )
 
-DATABASE_URL = "mysql+mysqlconnector://user:password@host:port/database"
+# Configuración de la base de datos
+host_name = "44.217.154.221"
+port_number = "8005"
+user_name = "root"
+password_db = "utec"
+database_name = "bd_api_employees"
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-
-class UserModel(Base):
-    __tablename__ = 'users'
-    id = Column(Integer, primary_key=True, index=True)
-    birth = Column(Integer)
-    highest = Column(Integer)
-    match = Column(Integer)
-    rank = Column(Integer)
-    rating = Column(Integer)
-    user = Column(String(255))
-    win = Column(Integer)
-
-
-Base.metadata.create_all(bind=engine)
-
-
+# Definición del esquema User
 class User(BaseModel):
     birth: int
     highest: int
@@ -49,71 +33,107 @@ class User(BaseModel):
     user: str
     win: int
 
+# Obtener todos los usuarios
+@app.get("/users", response_model=List[User])
+def get_users():
+    try:
+        mydb = mysql.connector.connect(
+            host=host_name,
+            port=port_number,
+            user=user_name,
+            password=password_db,
+            database=database_name
+        )
+        cursor = mydb.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users")
+        result = cursor.fetchall()
+        mydb.close()
+        return result
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error: {err}")
 
-class MySQLAPI:
-    def __init__(self):
-        self.db = SessionLocal()
+# Obtener un usuario por ID
+@app.get("/users/{id}", response_model=User)
+def get_user(id: int):
+    try:
+        mydb = mysql.connector.connect(
+            host=host_name,
+            port=port_number,
+            user=user_name,
+            password=password_db,
+            database=database_name
+        )
+        cursor = mydb.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users WHERE id = %s", (id,))
+        result = cursor.fetchone()
+        mydb.close()
+        if result:
+            return result
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error: {err}")
 
-    def read(self) -> List[Dict[str, Any]]:
-        users = self.db.query(UserModel).all()
-        return [user.__dict__ for user in users]
+# Añadir un nuevo usuario
+@app.post("/users", response_model=Dict[str, Any])
+def add_user(user: User):
+    try:
+        mydb = mysql.connector.connect(
+            host=host_name,
+            port=port_number,
+            user=user_name,
+            password=password_db,
+            database=database_name
+        )
+        cursor = mydb.cursor()
+        sql = "INSERT INTO users (birth, highest, id, match, rank, rating, user, win) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+        val = (user.birth, user.highest, user.id, user.match, user.rank, user.rating, user.user, user.win)
+        cursor.execute(sql, val)
+        mydb.commit()
+        mydb.close()
+        return {"message": "User added successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error: {err}")
 
-    def write(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        new_user = UserModel(**data)
-        self.db.add(new_user)
-        self.db.commit()
-        self.db.refresh(new_user)
-        return {"Status": "Successfully Inserted", "User_ID": new_user.id}
+# Modificar un usuario
+@app.put("/users/{id}", response_model=Dict[str, Any])
+def update_user(id: int, user: User):
+    try:
+        mydb = mysql.connector.connect(
+            host=host_name,
+            port=port_number,
+            user=user_name,
+            password=password_db,
+            database=database_name
+        )
+        cursor = mydb.cursor()
+        sql = "UPDATE users SET birth=%s, highest=%s, match=%s, rank=%s, rating=%s, user=%s, win=%s WHERE id=%s"
+        val = (user.birth, user.highest, user.match, user.rank, user.rating, user.user, user.win, id)
+        cursor.execute(sql, val)
+        mydb.commit()
+        mydb.close()
+        return {"message": "User modified successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error: {err}")
 
-    def update(self, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
-        user = self.db.query(UserModel).filter(UserModel.id == user_id).first()
-        if not user:
-            return {"Status": "User not found"}
-        for key, value in data.items():
-            setattr(user, key, value)
-        self.db.commit()
-        return {"Status": "Successfully Updated"}
-
-    def delete(self, user_id: int) -> Dict[str, Any]:
-        user = self.db.query(UserModel).filter(UserModel.id == user_id).first()
-        if not user:
-            return {"Status": "User not found"}
-        self.db.delete(user)
-        self.db.commit()
-        return {"Status": "Successfully Deleted"}
-
-
-@app.get("/")
-async def base():
-    return {"Status": "UP"}
-
-
-@app.get("/mysql", response_model=List[User])
-async def mysql_read():
-    db = MySQLAPI()
-    response = db.read()
-    return response
-
-
-@app.post("/mysql", response_model=Dict[str, Any])
-async def mysql_write(user: User):
-    db = MySQLAPI()
-    response = db.write(user.dict())
-    return response
-
-
-@app.put("/mysql/{user_id}", response_model=Dict[str, Any])
-async def mysql_update(user_id: int, user: User):
-    db = MySQLAPI()
-    response = db.update(user_id, user.dict())
-    return response
-
-
-@app.delete("/mysql/{user_id}", response_model=Dict[str, Any])
-async def mysql_delete(user_id: int):
-    db = MySQLAPI()
-    response = db.delete(user_id)
-    return response
+# Eliminar un usuario por ID
+@app.delete("/users/{id}", response_model=Dict[str, Any])
+def delete_user(id: int):
+    try:
+        mydb = mysql.connector.connect(
+            host=host_name,
+            port=port_number,
+            user=user_name,
+            password=password_db,
+            database=database_name
+        )
+        cursor = mydb.cursor()
+        cursor.execute("DELETE FROM users WHERE id = %s", (id,))
+        mydb.commit()
+        mydb.close()
+        return {"message": "User deleted successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error: {err}")
 
 if __name__ == "__main__":
     import uvicorn
