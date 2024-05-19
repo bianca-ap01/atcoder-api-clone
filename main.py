@@ -16,11 +16,11 @@ app.add_middleware(
 )
 
 # Configuración de la base de datos
-host_name = "44.217.154.221"
+host_name = "3.221.35.104"
 port_number = "8005"
 user_name = "root"
 password_db = "utec"
-database_name = "bd_api_employees"
+database_name = "bd_api_atcoder"
 
 # Definición del esquema User
 class User(BaseModel):
