@@ -2,7 +2,7 @@ DROP DATABASE IF EXISTS bd_api_atcoder;
 CREATE DATABASE atcoder CHARSET utf8mb4;
 USE atcoder;
 
-CREATE TABLE users (
+CREATE TABLE usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     birth INT,
     highest INT,
