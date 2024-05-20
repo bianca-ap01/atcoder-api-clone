@@ -20,7 +20,7 @@ host_name = "3.221.35.104"
 port_number = "8005"
 user_name = "root"
 password_db = "utec"
-database_name = "proyecto_parcial"
+database_name = "bd_api_atcoder"
 
 # Definición del esquema User
 class User(BaseModel):
@@ -42,14 +42,14 @@ def get_users():
             database=database_name
         )
         cursor = mydb.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM atcoder.user")
+        cursor.execute("SELECT * FROM users")
         result = cursor.fetchall()
         mydb.close()
         return result
     except mysql.connector.Error as err:
         raise HTTPException(status_code=500, detail=f"Error: {err}")
 
-# Obtener un usuario por handle
+# Obtener un usuario por ID
 @app.get("/users/{handle}", response_model=User)
 def get_user(handle: str):
     try:
@@ -61,7 +61,7 @@ def get_user(handle: str):
             database=database_name
         )
         cursor = mydb.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM atcoder.user WHERE handle = %s", (handle,))
+        cursor.execute("SELECT * FROM users WHERE handle = %s", (handle,))
         result = cursor.fetchone()
         mydb.close()
         if result:
@@ -83,7 +83,7 @@ def add_user(user: User):
             database=database_name
         )
         cursor = mydb.cursor()
-        sql = "INSERT INTO atcoder.user (handle, email, rank, rating, user) VALUES (%s, %s, %s, %s, %s)"
+        sql = "INSERT INTO users (handle, email, rank, rating, user) VALUES (%s, %s, %s, %s, %s)"
         val = (user.handle, user.email, user.rank, user.rating, user.user)
         cursor.execute(sql, val)
         mydb.commit()
@@ -104,7 +104,7 @@ def update_user(handle: str, user: User):
             database=database_name
         )
         cursor = mydb.cursor()
-        sql = "UPDATE atcoder.user SET email=%s, rank=%s, rating=%s, user=%s WHERE handle=%s"
+        sql = "UPDATE users SET email=%s, rank=%s, rating=%s, user=%s WHERE handle=%s"
         val = (user.email, user.rank, user.rating, user.user, handle)
         cursor.execute(sql, val)
         mydb.commit()
@@ -113,7 +113,7 @@ def update_user(handle: str, user: User):
     except mysql.connector.Error as err:
         raise HTTPException(status_code=500, detail=f"Error: {err}")
 
-# Eliminar un usuario por handle
+# Eliminar un usuario por ID
 @app.delete("/users/{handle}", response_model=Dict[str, Any])
 def delete_user(handle: str):
     try:
@@ -125,7 +125,7 @@ def delete_user(handle: str):
             database=database_name
         )
         cursor = mydb.cursor()
-        cursor.execute("DELETE FROM atcoder.user WHERE handle = %s", (handle,))
+        cursor.execute("DELETE FROM users WHERE handle = %s", (handle,))
         mydb.commit()
         mydb.close()
         return {"message": "User deleted successfully"}
